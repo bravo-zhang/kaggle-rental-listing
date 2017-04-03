@@ -1,0 +1,7 @@
+images_sample/
+.idea/
+.ipynb_checkpoints/
+*.pyc
+*.csv
+*.json
+*.pkl
