@@ -1,21 +1,27 @@
+import numpy as np
 import pandas as pd
+import argparse
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, GridSearchCV
-from sklearn.metrics import log_loss
+from sklearn.model_selection import cross_val_score
+from sklearn.externals import joblib
 
-X_train = pd.read_csv("train_plain_col.csv", encoding='utf-8')
+parser = argparse.ArgumentParser(description='Random Forest Model.')
+parser.add_argument('-s', action='store_true', default=False,
+                    help='Set this flag for submission. Default is cross validation.')
+args = parser.parse_args()
+
+X_train = pd.read_csv("data/train_python.csv", encoding='utf-8')
 y_train = X_train['interest_level']
 X_train = X_train.drop('interest_level', axis=1)
-X_train_part, X_valid, y_train_part, y_valid = train_test_split(X_train, y_train, test_size=0.3)
 
-print len(list(X_train))
-print log_loss(y_valid, RandomForestClassifier().fit(X_train_part, y_train_part).predict_proba(X_valid))
-
-param_grid = {'n_estimators': [500, 700, 1000], 'max_features': [16, 17, 18]}
-model = GridSearchCV(param_grid=param_grid, n_jobs=2, cv=3, verbose=20, scoring="neg_log_loss",
-                     estimator=RandomForestClassifier())
-model = model.fit(X_train_part, y_train_part)
-print model
-print model.cv_results_
-print model.best_params_
-print log_loss(y_valid, model.predict_proba(X_valid))
+clf = RandomForestClassifier(1000)
+if args.s:
+    clf.fit(X_train, y_train)
+    joblib.dump(clf, 'checkpoint/rf.pkl')
+    X_test = pd.read_csv("data/test_python.csv", encoding='utf-8')
+    pred = clf.predict_proba(X_test)
+    np.savetxt('submission/submission.csv', np.c_[X_test['listing_id'], pred[:, [2, 1, 0]]], delimiter=',',
+               header='listing_id,high,medium,low', fmt='%d,%.16f,%.16f,%.16f', comments='')
+else:
+    scores = cross_val_score(clf, X_train, y_train, scoring='neg_log_loss', cv=5, n_jobs=-1)
+    print(scores)
