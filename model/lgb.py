@@ -1,20 +1,16 @@
+import numpy as np
 import pandas as pd
 import lightgbm as lgb
-from lightgbm import LGBMClassifier
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import log_loss
+import argparse
 from sklearn.externals import joblib
 
+parser = argparse.ArgumentParser(description='Light Gradient Boosting Tree Model.')
+parser.add_argument('-n', default=2000, type=int, help='Number of boosting rounds.')
+parser.add_argument('-s', action='store_true', default=False,
+                    help='Set this flag for submission. Default is cross validation.')
+args = parser.parse_args()
 
-# X_train = pd.read_csv("train_python.csv", encoding='utf-8')
-X_train = pd.read_csv("train_plain_col.csv", encoding='utf-8')
-y_train = X_train['interest_level']
-X_train = X_train.drop('interest_level', axis=1)
-
-X_train_part, X_valid, y_train_part, y_valid = train_test_split(X_train, y_train, test_size=0.3)
-
-num_rounds = 2000
-
+num_rounds = args.n
 lgb_param = {
     'task': 'train',
     'boosting_type': 'gbdt',
@@ -29,12 +25,18 @@ lgb_param = {
     'verbose': 0
 }
 
-lgb_train = lgb.Dataset(X_train_part, y_train_part)
-lgb_valid = lgb.Dataset(X_valid, y_valid, reference=lgb_train)
-gbm = lgb.train(lgb_param, lgb_train, num_boost_round=num_rounds, valid_sets=lgb_valid, early_stopping_rounds=10)
-y_pred = gbm.predict(X_valid, num_iteration=gbm.best_iteration)
-print log_loss(y_valid, y_pred)
+X_train = pd.read_csv("data/train_python.csv", encoding='utf-8')
+y_train = X_train['interest_level']
+X_train = X_train.drop('interest_level', axis=1)
+lgb_train = lgb.Dataset(X_train, y_train)
 
-# lgb_train = lgb.Dataset(X_train, y_train)
-# gbm = lgb.train(lgb_param, lgb_train, num_boost_round=num_rounds)
-# joblib.dump(gbm, 'lgb.pkl')
+if args.s:
+    clf = lgb.train(lgb_param, lgb_train, num_boost_round=num_rounds)
+    joblib.dump(clf, 'checkpoint/lgb.pkl')
+    X_test = pd.read_csv("data/test_python.csv", encoding='utf-8')
+    pred = clf.predict(X_test)
+    np.savetxt('submission/submission.csv', np.c_[X_test['listing_id'], pred[:, [2, 1, 0]]], delimiter=',',
+               header='listing_id,high,medium,low', fmt='%d,%.16f,%.16f,%.16f', comments='')
+else:
+    cv_results = lgb.cv(lgb_param, lgb_train, num_boost_round=num_rounds, nfold=5, stratified=True,
+                        early_stopping_rounds=20, callbacks=[lgb.callback.print_evaluation(show_stdv=True)])

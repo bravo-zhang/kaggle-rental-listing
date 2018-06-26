@@ -1,3 +1,7 @@
+#
+# Credits to https://www.kaggle.com/rakhlin/another-python-version-of-it-is-lit-by-branden/code
+#
+
 import numpy as np
 import pandas as pd
 from itertools import product
