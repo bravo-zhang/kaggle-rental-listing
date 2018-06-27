@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import argparse
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import cross_val_score, StratifiedKFold
 from sklearn.externals import joblib
 
 parser = argparse.ArgumentParser(description='Random Forest Model.')
@@ -13,8 +13,8 @@ args = parser.parse_args()
 X_train = pd.read_csv("data/train_python.csv", encoding='utf-8')
 y_train = X_train['interest_level']
 X_train = X_train.drop('interest_level', axis=1)
+clf = RandomForestClassifier(n_estimators=1000, criterion='gini', n_jobs=-1, random_state=2018)
 
-clf = RandomForestClassifier(1000)
 if args.s:
     clf.fit(X_train, y_train)
     joblib.dump(clf, 'checkpoint/rf.pkl')
@@ -23,5 +23,6 @@ if args.s:
     np.savetxt('submission/submission.csv', np.c_[X_test['listing_id'], pred[:, [2, 1, 0]]], delimiter=',',
                header='listing_id,high,medium,low', fmt='%d,%.16f,%.16f,%.16f', comments='')
 else:
-    scores = cross_val_score(clf, X_train, y_train, scoring='neg_log_loss', cv=5, n_jobs=-1)
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=2018)
+    scores = cross_val_score(clf, X_train, y_train, scoring='neg_log_loss', cv=cv, n_jobs=-1)
     print(scores)
